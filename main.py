@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 import logging
 import random
 import os
+from fastapi.responses import StreamingResponse
 
 # Retrieve env variables
 load_dotenv()
@@ -21,13 +22,13 @@ app = FastAPI()
 # /fortune API
 @app.get("/fortune")
 def read_fortune():
-    return get_fortune()
+    return StreamingResponse(generate_fortune(), media_type="text/event-stream")
 
-# Service method
-def get_fortune() -> str:
+# Service method for streaming
+def generate_fortune():
     try:
         # Strict response format
-        response_format={   
+        response_format = {   
             "type": "json",
             "value": {
                 "properties": {
@@ -70,8 +71,8 @@ def get_fortune() -> str:
             }
         ]
 
-        # API call and save response
-        fortune = client.chat.completions.create(
+        # API call and stream data directly
+        stream = client.chat_completion(            
             model=MODEL_NAME,
             messages=messages,
             temperature=1.3, 
@@ -79,15 +80,21 @@ def get_fortune() -> str:
             seed=random.randint(0, 10000),
             max_tokens=100,
             frequency_penalty=0.5,
-            response_format=response_format
-        ).choices[0].message.content
+            response_format=response_format,
+            stream=True
+        )
 
-        # Log the generated fortune
-        logger.info(f"Generated fortune: {fortune}")
+        # Streaming content back chunk by chunk
+        fortune_parts = []  
+        for token in stream:
+            content = token.choices[0].delta.content 
+            fortune_parts.append(content) 
+            yield f"{content}"  
 
-        # Return response
-        return fortune
-    
+        # Log the completed fortune after streaming
+        complete_fortune = " ".join(fortune_parts)
+        logger.info(f"Completed fortune: {complete_fortune}")
+
     except Exception as e:
         # Log the exception
         logger.error(f"An error occurred: {str(e)}")
