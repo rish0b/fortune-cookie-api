@@ -5,11 +5,14 @@ import logging
 import random
 import os
 from fastapi.responses import StreamingResponse
+from fastapi.middleware.cors import CORSMiddleware
+
 
 # Retrieve env variables
 load_dotenv()
 HF_API_TOKEN = os.getenv("HF_API_TOKEN")
 MODEL_NAME = os.getenv("MODEL_NAME")
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS")
 
 # Set up logging configuration
 logging.basicConfig(level=logging.INFO)
@@ -18,6 +21,20 @@ logger = logging.getLogger(__name__)
 client = InferenceClient(model=MODEL_NAME, token=HF_API_TOKEN)
 
 app = FastAPI()
+
+# Add CORS middleware to allow requests from any origin
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,  # Change "*" to specific domains if needed
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# / root path
+@app.get("/")
+def root():
+    return {"message": "Fortune Cookie 2.0"}
 
 # /fortune API
 @app.get("/fortune")
